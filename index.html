@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Freezer Inventory — Freezer 2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:ital,wght@0,300;0,500;1,300&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f6f4f0;--surface:#fff;--surface2:#f0ede8;--border:#e0dbd2;--border2:#c8c2b8;
+  --text:#1a1814;--text2:#5a5650;--text3:#9a948e;
+  --cold:#1e4a7a;--cold-light:#e4edf7;
+  --accent:#2d5a3d;--warm:#6b3a2a;--danger:#8b1a1a;
+  --radius:8px;--radius-lg:14px;--tap:44px;
+}
+html,body{height:100%}
+body{font-family:'Fraunces',Georgia,serif;background:var(--bg);color:var(--text);min-height:100vh;-webkit-text-size-adjust:100%}
+
+#lockScreen{position:fixed;inset:0;background:var(--cold);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;padding:2rem}
+#lockScreen h1{color:#fff;font-size:2rem;font-weight:300;margin-bottom:.5rem;text-align:center}
+#lockScreen p{color:rgba(255,255,255,.65);font-family:'DM Mono',monospace;font-size:.8rem;margin-bottom:2rem;text-align:center}
+.lock-box{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);border-radius:var(--radius-lg);padding:2rem;width:100%;max-width:340px;display:flex;flex-direction:column;gap:1rem}
+#pwInput{width:100%;padding:.9rem 1rem;border-radius:var(--radius);border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.15);color:#fff;font-family:'DM Mono',monospace;font-size:1rem;outline:none;text-align:center;letter-spacing:.1em}
+#pwInput::placeholder{color:rgba(255,255,255,.45);letter-spacing:0}
+#pwInput:focus{border-color:rgba(255,255,255,.7)}
+#pwBtn{width:100%;padding:.9rem;border-radius:var(--radius);border:none;background:#fff;color:var(--cold);font-family:'DM Mono',monospace;font-size:.9rem;font-weight:500;cursor:pointer}
+#pwErr{color:#ffaaaa;font-family:'DM Mono',monospace;font-size:.78rem;text-align:center;display:none}
+
+#app{display:none;flex-direction:column;min-height:100vh}
+header{background:var(--cold);color:#fff;padding:1.25rem 1rem 1rem;position:relative;overflow:hidden}
+header::before{content:'❄';position:absolute;right:-10px;top:-20px;font-size:140px;opacity:.06;line-height:1;pointer-events:none}
+header h1{font-size:1.5rem;font-weight:300;letter-spacing:-.02em;margin-bottom:.2rem}
+header p{font-size:.75rem;opacity:.65;font-family:'DM Mono',monospace}
+
+.sync-bar{background:var(--cold-light);border-bottom:1px solid #b5cfe8;padding:.5rem 1rem;display:flex;align-items:center;gap:.6rem;font-family:'DM Mono',monospace;font-size:.72rem;color:var(--cold)}
+.sync-dot{width:8px;height:8px;border-radius:50%;background:#aaa;flex-shrink:0;transition:background .3s}
+.sync-dot.ok{background:#2d8a4e}
+.sync-dot.syncing{background:#e8a020;animation:pulse 1s infinite}
+.sync-dot.error{background:#c0392b}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.sync-btn{margin-left:auto;padding:.35rem .8rem;border-radius:var(--radius);border:1px solid #b5cfe8;background:#fff;color:var(--cold);font-family:'DM Mono',monospace;font-size:.72rem;cursor:pointer;min-height:var(--tap);display:flex;align-items:center;gap:.35rem}
+.sync-btn:active{background:var(--cold);color:#fff}
+
+.toolbar{background:var(--surface);border-bottom:1px solid var(--border);padding:.75rem 1rem;display:flex;flex-direction:column;gap:.6rem;position:sticky;top:0;z-index:100}
+.toolbar-row{display:flex;gap:.5rem;align-items:center}
+.search-wrap{position:relative;flex:1}
+.search-wrap i{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text3);font-size:14px;pointer-events:none}
+#search{width:100%;padding:.65rem .75rem .65rem 2.2rem;border:1px solid var(--border);border-radius:var(--radius);font-family:'DM Mono',monospace;font-size:.85rem;background:var(--bg);color:var(--text);outline:none;min-height:var(--tap)}
+#search:focus{border-color:var(--cold)}
+.type-filter{padding:.65rem .75rem;border:1px solid var(--border);border-radius:var(--radius);font-family:'DM Mono',monospace;font-size:.8rem;background:var(--bg);color:var(--text);outline:none;cursor:pointer;flex:1;min-height:var(--tap)}
+.btn{padding:.65rem 1rem;border-radius:var(--radius);font-family:'DM Mono',monospace;font-size:.8rem;cursor:pointer;border:1px solid var(--border);background:var(--surface);color:var(--text);white-space:nowrap;display:flex;align-items:center;justify-content:center;gap:.4rem;min-height:var(--tap);flex:1}
+.btn.primary{background:var(--cold);color:#fff;border-color:var(--cold)}
+.btn:active{opacity:.8}
+
+main{padding:1rem;display:flex;flex-direction:column;gap:1rem;flex:1}
+
+.shelf-section{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden}
+.shelf-header{padding:.75rem 1rem;display:flex;align-items:center;gap:.6rem;border-bottom:1px solid var(--border);cursor:pointer;user-select:none;min-height:var(--tap)}
+.shelf-header:active{background:var(--surface2)}
+.shelf-icon{width:34px;height:34px;border-radius:var(--radius);display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0}
+.shelf-label{font-size:.9rem;font-weight:500;flex:1;line-height:1.3}
+.shelf-actions{display:flex;gap:.25rem;flex-shrink:0}
+.icon-btn{width:var(--tap);height:var(--tap);border:none;background:none;cursor:pointer;color:var(--text3);font-size:13px;display:flex;align-items:center;justify-content:center;border-radius:var(--radius);flex-shrink:0}
+.icon-btn:active{background:var(--surface2);color:var(--cold)}
+.shelf-toggle{font-size:11px;color:var(--text3);transition:transform .2s;padding:0 4px}
+.shelf-toggle.open{transform:rotate(180deg)}
+.shelf-body{padding:.875rem 1rem;display:flex;flex-direction:column;gap:.75rem}
+.shelf-body.collapsed{display:none}
+
+.zone{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:.75rem}
+.zone-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem;gap:.5rem}
+.zone-label-text{font-size:.68rem;font-family:'DM Mono',monospace;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;flex:1;border:none;background:none;outline:none;padding:0;min-width:0;min-height:36px}
+.zone-label-text:focus{color:var(--cold)}
+
+.type-group{margin-bottom:.6rem}
+.type-header{display:flex;align-items:center;border-bottom:1px solid var(--border);padding-bottom:.25rem;margin-bottom:.35rem;gap:.25rem}
+.type-name-edit{background:none;border:none;font-family:'DM Mono',monospace;font-size:.7rem;color:var(--text2);flex:1;outline:none;padding:0;min-width:0;min-height:36px}
+.type-name-edit:focus{color:var(--cold)}
+.mini-btn{width:32px;height:32px;border:none;background:none;cursor:pointer;color:var(--text3);font-size:11px;display:flex;align-items:center;justify-content:center;border-radius:6px;flex-shrink:0}
+.mini-btn:active{background:var(--surface2);color:var(--danger)}
+
+.item-row{display:flex;align-items:center;gap:.4rem;padding:.3rem .2rem;border-radius:6px}
+.qty-wrap{display:flex;align-items:center;gap:.3rem;flex-shrink:0}
+.qty-btn{width:32px;height:32px;border-radius:6px;border:1px solid var(--border);background:var(--surface);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--text2);flex-shrink:0}
+.qty-btn:active{background:var(--cold);color:#fff;border-color:var(--cold)}
+.qty{font-size:.8rem;font-family:'DM Mono',monospace;color:var(--text3);min-width:18px;text-align:center}
+.item-name-input{font-family:'Fraunces',serif;font-size:.88rem;font-weight:300;color:var(--text);background:none;border:none;outline:none;flex:1;min-width:0}
+.item-name-input:focus{background:var(--surface);border-radius:4px;padding:0 4px}
+.open-tag{display:inline-block;font-size:.6rem;font-family:'DM Mono',monospace;background:#fff3cd;color:#7a6000;border-radius:3px;padding:1px 5px;white-space:nowrap;flex-shrink:0}
+.item-actions{display:flex;gap:2px;flex-shrink:0}
+.act-btn{width:32px;height:32px;border:none;background:none;cursor:pointer;font-size:12px;flex-shrink:0;border-radius:6px;display:flex;align-items:center;justify-content:center;color:var(--text3)}
+.act-btn:active{background:var(--surface2)}
+.act-btn.move{color:var(--cold)}
+.act-btn.del:active{color:var(--danger)}
+
+.add-item-row{display:flex;gap:.4rem;margin-top:.4rem}
+.add-item-input{flex:1;font-family:'Fraunces',serif;font-size:.85rem;padding:.55rem .65rem;border:1px dashed var(--border2);border-radius:6px;background:transparent;color:var(--text);outline:none;min-height:var(--tap)}
+.add-item-input:focus{border-color:var(--cold);border-style:solid}
+.add-item-btn{padding:.55rem .9rem;border-radius:6px;border:1px solid var(--cold);background:var(--cold-light);color:var(--cold);font-size:.8rem;cursor:pointer;font-family:'DM Mono',monospace;min-height:var(--tap);white-space:nowrap}
+.add-item-btn:active{background:var(--cold);color:#fff}
+.add-type-btn{width:100%;margin-top:.4rem;padding:.6rem;border:1px dashed var(--border2);border-radius:6px;background:none;color:var(--text3);font-size:.72rem;font-family:'DM Mono',monospace;cursor:pointer;text-align:left;min-height:var(--tap);display:flex;align-items:center;gap:.4rem}
+.add-type-btn:active{color:var(--cold)}
+.add-zone-btn{width:100%;padding:.6rem;border:1px dashed var(--border2);border-radius:var(--radius);background:none;color:var(--text3);font-size:.75rem;font-family:'DM Mono',monospace;cursor:pointer;min-height:var(--tap);display:flex;align-items:center;gap:.4rem}
+.add-zone-btn:active{color:var(--cold);border-color:var(--cold)}
+
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;display:flex;align-items:flex-end;justify-content:center;padding:1rem}
+.modal{background:var(--surface);border-radius:var(--radius-lg) var(--radius-lg) var(--radius) var(--radius);width:100%;max-width:480px;max-height:80vh;display:flex;flex-direction:column;overflow:hidden}
+.modal-header{padding:1rem 1.25rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.modal-header h2{font-size:1rem;font-weight:500}
+.modal-close{width:var(--tap);height:var(--tap);border:none;background:none;cursor:pointer;font-size:18px;color:var(--text3);display:flex;align-items:center;justify-content:center;border-radius:var(--radius)}
+.modal-close:active{background:var(--surface2)}
+.modal-body{padding:1rem 1.25rem;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:.75rem}
+.modal-label{font-size:.75rem;font-family:'DM Mono',monospace;color:var(--text3);margin-bottom:.25rem}
+.modal-select{width:100%;padding:.75rem;border:1px solid var(--border);border-radius:var(--radius);font-family:'DM Mono',monospace;font-size:.85rem;background:var(--bg);color:var(--text);outline:none;min-height:var(--tap)}
+.modal-select:focus{border-color:var(--cold)}
+.modal-footer{padding:1rem 1.25rem;border-top:1px solid var(--border);display:flex;gap:.75rem;flex-shrink:0}
+.modal-btn{flex:1;padding:.75rem;border-radius:var(--radius);font-family:'DM Mono',monospace;font-size:.85rem;cursor:pointer;min-height:var(--tap);border:1px solid var(--border);background:var(--surface);color:var(--text)}
+.modal-btn.confirm{background:var(--cold);color:#fff;border-color:var(--cold)}
+.modal-btn:active{opacity:.8}
+
+.no-results{text-align:center;padding:3rem 1rem;color:var(--text3);font-family:'DM Mono',monospace;font-size:.8rem}
+
+/* Add Shelf modal */
+.color-picker{display:flex;gap:.5rem;flex-wrap:wrap}
+.color-opt{width:44px;height:44px;border-radius:var(--radius);border:2px solid transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;transition:border-color .15s}
+.color-opt.selected{border-color:var(--text)}
+.modal-input{width:100%;padding:.75rem;border:1px solid var(--border);border-radius:var(--radius);font-family:'Fraunces',serif;font-size:.95rem;background:var(--bg);color:var(--text);outline:none;min-height:var(--tap)}
+.modal-input:focus{border-color:var(--cold)}
+
+/* Drag and drop */
+.shelf-section{transition:opacity .15s}
+.shelf-section.dragging{opacity:.4}
+.shelf-section.drag-over{outline:2px solid var(--cold);outline-offset:2px}
+.drag-handle{width:var(--tap);height:var(--tap);border:none;background:none;cursor:grab;color:var(--text3);font-size:13px;display:flex;align-items:center;justify-content:center;border-radius:var(--radius);flex-shrink:0;touch-action:none}
+.drag-handle:active{cursor:grabbing;color:var(--cold)}
+.drag-ghost{position:fixed;pointer-events:none;z-index:9000;opacity:.85;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:.5rem 1rem;font-family:'DM Mono',monospace;font-size:.8rem;color:var(--text);box-shadow:0 8px 24px rgba(0,0,0,.18);white-space:nowrap;max-width:260px;overflow:hidden;text-overflow:ellipsis}
+.no-results i{display:block;font-size:2rem;margin-bottom:.75rem}
+.loading{text-align:center;padding:4rem 1rem;color:var(--text3);font-family:'DM Mono',monospace;font-size:.85rem}
+.loading i{display:block;font-size:2rem;margin-bottom:1rem;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+footer{text-align:center;padding:1.5rem 1rem;color:var(--text3);font-family:'DM Mono',monospace;font-size:.7rem}
+</style>
+</head>
+<body>
+
+<div id="lockScreen">
+  <h1>❄ Freezer Inventory — Freezer 2</h1>
+  <p>Mennella Family · Enter password to continue</p>
+  <div class="lock-box">
+    <input type="password" id="pwInput" placeholder="Password" autocomplete="current-password" onkeydown="if(event.key==='Enter')checkPw()">
+    <button id="pwBtn" onclick="checkPw()">Unlock</button>
+    <div id="pwErr">Incorrect password — try again</div>
+  </div>
+</div>
+
+<div id="app">
+  <header>
+    <h1>❄ Freezer Inventory — Freezer 2</h1>
+    <p>Mennella Family · Changes sync across all devices</p>
+  </header>
+  <div class="sync-bar">
+    <div class="sync-dot" id="syncDot"></div>
+    <span id="syncStatus">Connecting…</span>
+    <button class="sync-btn" onclick="syncNow()"><i class="fa fa-rotate-right"></i> Sync</button>
+  </div>
+  <div class="toolbar">
+    <div class="toolbar-row">
+      <div class="search-wrap">
+        <i class="fa fa-search"></i>
+        <input type="search" id="search" placeholder="Search items…" oninput="render()" autocomplete="off">
+      </div>
+    </div>
+    <div class="toolbar-row">
+      <select class="type-filter" id="typeFilter" onchange="render()">
+        <option value="">All types</option>
+      </select>
+      <button class="btn primary" onclick="addShelf()"><i class="fa fa-plus"></i> Add shelf</button>
+      <button class="btn" onclick="exportData()"><i class="fa fa-download"></i> Export</button>
+    </div>
+  </div>
+  <main id="main"><div class="loading"><i class="fa fa-snowflake"></i>Loading…</div></main>
+  <footer>Auto-saved · Last saved: <span id="lastSaved">—</span></footer>
+</div>
+
+<div class="modal-overlay" id="moveModal" style="display:none" onclick="if(event.target===this)closeMoveModal()">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Move item</h2>
+      <button class="modal-close" onclick="closeMoveModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div><div class="modal-label">Moving: <strong id="moveItemName"></strong></div></div>
+      <div>
+        <div class="modal-label">Destination shelf</div>
+        <select class="modal-select" id="moveShelf" onchange="updateMoveZones()"></select>
+      </div>
+      <div>
+        <div class="modal-label">Destination zone</div>
+        <select class="modal-select" id="moveZone" onchange="updateMoveTypes()"></select>
+      </div>
+      <div>
+        <div class="modal-label">Destination category</div>
+        <select class="modal-select" id="moveType"></select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="modal-btn" onclick="closeMoveModal()">Cancel</button>
+      <button class="modal-btn confirm" onclick="confirmMove()">Move item</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Shelf Modal -->
+<div class="modal-overlay" id="addShelfModal" style="display:none" onclick="if(event.target===this)closeAddShelfModal()">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Add shelf</h2>
+      <button class="modal-close" onclick="closeAddShelfModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div>
+        <div class="modal-label">Shelf label</div>
+        <input class="modal-input" id="newShelfLabel" placeholder="e.g. Top shelf — left" maxlength="60">
+      </div>
+      <div>
+        <div class="modal-label" style="margin-bottom:.5rem">Color theme</div>
+        <div class="color-picker" id="colorPicker">
+          <div class="color-opt selected" data-color="cold" style="background:#e4edf7;color:#1e4a7a" title="Cold blue">❄</div>
+          <div class="color-opt" data-color="accent" style="background:#e8f2ec;color:#2d5a3d" title="Green">🌿</div>
+          <div class="color-opt" data-color="warm" style="background:#f5ece4;color:#6b3a2a" title="Warm">🍞</div>
+          <div class="color-opt" data-color="pink" style="background:#fce8f0;color:#8b2a5a" title="Pink">🍦</div>
+          <div class="color-opt" data-color="door" style="background:#f0ede8;color:#5a5650" title="Door">🚪</div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="modal-btn" onclick="closeAddShelfModal()">Cancel</button>
+      <button class="modal-btn confirm" onclick="confirmAddShelf()">Add shelf</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const PASSWORD = 'GirlPowerFreeze';
+const WORKER_URL = 'https://freezer2-gist.thomas-mennella.workers.dev';
+
+function checkPw(){
+  if(document.getElementById('pwInput').value===PASSWORD){
+    localStorage.setItem('freezer2_auth','1');
+    document.getElementById('lockScreen').style.display='none';
+    document.getElementById('app').style.display='flex';
+    loadFromGist();
+  } else {
+    document.getElementById('pwErr').style.display='block';
+    document.getElementById('pwInput').value='';
+    document.getElementById('pwInput').focus();
+  }
+}
+
+if(localStorage.getItem('freezer2_auth')==='1'){
+  document.getElementById('lockScreen').style.display='none';
+  document.getElementById('app').style.display='flex';
+}
+
+const DEFAULT_DATA = {shelves:[
+  {id:"s1",label:"Top shelf — left",color:"cold",icon:"fa-temperature-low",zones:[
+    {id:"z1a",label:"Items",types:[
+      {id:"t1a1",name:"Pizza & breads",items:[
+        {id:"i1",name:"Gluten-free pizza",qty:8,open:false},
+        {id:"i2",name:"Personal pan pizza",qty:1,open:false},
+        {id:"i3",name:"Paratha (Indian bread)",qty:1,open:false}
+      ]},
+      {id:"t1a2",name:"Sweets",items:[
+        {id:"i4",name:"Caramel cone ice cream bar",qty:1,open:false}
+      ]}
+    ]}
+  ]},
+  {id:"s2",label:"Top shelf — middle",color:"cold",icon:"fa-temperature-low",zones:[
+    {id:"z2a",label:"Items",types:[
+      {id:"t2a1",name:"Prepared meals",items:[
+        {id:"i5",name:"Santa Fe rice and beans",qty:1,open:false},
+        {id:"i6",name:"Soup dumplings",qty:1,open:false}
+      ]}
+    ]}
+  ]},
+  {id:"s3",label:"Top shelf — right",color:"cold",icon:"fa-temperature-low",zones:[
+    {id:"z3a",label:"Items",types:[
+      {id:"t3a1",name:"Seafood",items:[
+        {id:"i7",name:"Smoked salmon",qty:1,open:false}
+      ]},
+      {id:"t3a2",name:"Sweets",items:[
+        {id:"i8",name:"Mini ice cream cones (strawberry)",qty:1,open:false},
+        {id:"i9",name:"Pecan pie",qty:1,open:false}
+      ]},
+      {id:"t3a3",name:"Prepared meals",items:[
+        {id:"i10",name:"Lean Cuisine glazed chicken",qty:1,open:false},
+        {id:"i11",name:"Patriot pie",qty:1,open:false},
+        {id:"i12",name:"Vegetable bibimbap",qty:1,open:false},
+        {id:"i13",name:"Frozen Costco burritos",qty:1,open:false}
+      ]}
+    ]}
+  ]},
+  {id:"s4",label:"Second shelf — left",color:"cold",icon:"fa-temperature-low",zones:[
+    {id:"z4a",label:"Items",types:[
+      {id:"t4a1",name:"Sausages & franks",items:[
+        {id:"i14",name:"Roasted garlic chicken sausage",qty:2,open:false},
+        {id:"i15",name:"Sun-dried tomato chicken sausages",qty:1,open:false},
+        {id:"i16",name:"Gold Park Franks",qty:1,open:false},
+        {id:"i17",name:"Cheddar smoked sausage",qty:1,open:false},
+        {id:"i18",name:"Spicy jalapeño chicken sausage",qty:1,open:false}
+      ]},
+      {id:"t4a2",name:"Raw chicken",items:[
+        {id:"i19",name:"Raw chicken tenderloin",qty:1,open:false}
+      ]},
+      {id:"t4a3",name:"Quick heat & snacks",items:[
+        {id:"i20",name:"Costco marinated cooked pork",qty:1,open:false},
+        {id:"i21",name:"Gluten-free egg rolls",qty:1,open:false},
+        {id:"i22",name:"Gluten-free mozzarella sticks",qty:1,open:false},
+        {id:"i23",name:"Gluten-free jalapeño bites",qty:3,open:false}
+      ]}
+    ]}
+  ]},
+  {id:"s5",label:"Second shelf — middle",color:"cold",icon:"fa-temperature-low",zones:[
+    {id:"z5a",label:"Items",types:[
+      {id:"t5a1",name:"Raw chicken",items:[
+        {id:"i24",name:"Organic boneless skinless chicken thighs",qty:1,open:false},
+        {id:"i25",name:"Marinated chicken breast",qty:1,open:false}
+      ]},
+      {id:"t5a2",name:"Beef, pork & other meat",items:[
+        {id:"i26",name:"Ground turkey",qty:2,open:false},
+        {id:"i27",name:"Ribs",qty:1,open:false}
+      ]},
+      {id:"t5a3",name:"Seafood",items:[
+        {id:"i28",name:"Salmon fillets, skin on",qty:1,open:false},
+        {id:"i29",name:"Scallops",qty:1,open:false},
+        {id:"i30",name:"Crab cakes",qty:1,open:false},
+        {id:"i31",name:"Whole salmon",qty:1,open:false}
+      ]},
+      {id:"t5a4",name:"Quick heat & snacks",items:[
+        {id:"i32",name:"Bean, rice & cheese burritos",qty:1,open:false}
+      ]}
+    ]}
+  ]},
+  {id:"s6",label:"Second shelf — right",color:"cold",icon:"fa-temperature-low",zones:[
+    {id:"z6a",label:"Items",types:[
+      {id:"t6a1",name:"Raw chicken",items:[
+        {id:"i33",name:"Cilantro lime chicken",qty:1,open:false}
+      ]},
+      {id:"t6a2",name:"Beef, pork & other meat",items:[
+        {id:"i34",name:"Lamb shoulder chops",qty:1,open:false},
+        {id:"i35",name:"Ground beef",qty:2,open:false},
+        {id:"i36",name:"Pork tenderloin",qty:1,open:false},
+        {id:"i37",name:"T-bone steak",qty:1,open:false},
+        {id:"i38",name:"Hot roast",qty:1,open:false}
+      ]},
+      {id:"t6a3",name:"Seafood",items:[
+        {id:"i39",name:"Shrimp",qty:1,open:false}
+      ]},
+      {id:"t6a4",name:"Prepared meals",items:[
+        {id:"i40",name:"Chicken teriyaki bowl",qty:1,open:false}
+      ]}
+    ]}
+  ]},
+  {id:"s7",label:"Third shelf — left",color:"cold",icon:"fa-temperature-low",zones:[
+    {id:"z7a",label:"Items",types:[
+      {id:"t7a1",name:"Plant-based meats",items:[
+        {id:"i41",name:"Impossible bratwurst",qty:1,open:false},
+        {id:"i42",name:"Beyond beef patties",qty:1,open:false},
+        {id:"i43",name:"Beyond steak, seared BBQ-style tips",qty:1,open:false},
+        {id:"i44",name:"Impossible ground sausage",qty:1,open:false},
+        {id:"i45",name:"Morningstar Farms patties",qty:1,open:false},
+        {id:"i46",name:"Morningstar Farms sausage patties",qty:1,open:false},
+        {id:"i47",name:"Impossible ground beef",qty:1,open:false},
+        {id:"i48",name:"Fake meat chorizo crumbles",qty:1,open:false},
+        {id:"i49",name:"Meat-free chicken sliders",qty:1,open:false}
+      ]},
+      {id:"t7a2",name:"Sweets",items:[
+        {id:"i50",name:"Italian ices",qty:1,open:false}
+      ]}
+    ]}
+  ]},
+  {id:"s8",label:"Third shelf — right",color:"cold",icon:"fa-temperature-low",zones:[
+    {id:"z8a",label:"Items",types:[
+      {id:"t8a1",name:"Pizza & breads",items:[
+        {id:"i51",name:"DiGiorno thin crust pizza",qty:1,open:false},
+        {id:"i52",name:"Newman's Own supreme pizza",qty:1,open:false},
+        {id:"i53",name:"Newman's Own bourbon & barbecue chicken",qty:1,open:false},
+        {id:"i54",name:"Newman's Own four cheese pizza",qty:1,open:false},
+        {id:"i55",name:"Gluten-free pizza crust",qty:1,open:false}
+      ]},
+      {id:"t8a2",name:"Quick heat & snacks",items:[
+        {id:"i56",name:"Breaded chicken nuggets",qty:1,open:false},
+        {id:"i57",name:"Costco party cheese platter",qty:1,open:false}
+      ]}
+    ]}
+  ]},
+  {id:"s9",label:"Fourth shelf — left",color:"cold",icon:"fa-temperature-low",zones:[
+    {id:"z9a",label:"Items",types:[
+      {id:"t9a1",name:"Other",items:[
+        {id:"i58",name:"Frozen ready-to-go vegetables",qty:1,open:false},
+        {id:"i59",name:"Butter",qty:1,open:false}
+      ]}
+    ]}
+  ]},
+  {id:"s10",label:"Fourth shelf — middle",color:"cold",icon:"fa-temperature-low",zones:[
+    {id:"z10a",label:"Items",types:[
+      {id:"t10a1",name:"Frozen vegetables",items:[
+        {id:"i60",name:"Sugar snap peas",qty:1,open:false},
+        {id:"i61",name:"Balsamic Brussels sprouts",qty:1,open:false},
+        {id:"i62",name:"Cauliflower florets",qty:1,open:false},
+        {id:"i63",name:"Sweet peas",qty:1,open:false},
+        {id:"i64",name:"Asian medley",qty:2,open:false},
+        {id:"i65",name:"Cauliflower tots",qty:1,open:false},
+        {id:"i66",name:"Broccoli florets",qty:1,open:false},
+        {id:"i67",name:"Brussels sprouts",qty:2,open:false}
+      ]},
+      {id:"t10a2",name:"Fruit",items:[
+        {id:"i68",name:"Frozen strawberries",qty:1,open:false}
+      ]}
+    ]}
+  ]},
+  {id:"s11",label:"Fourth shelf — right",color:"cold",icon:"fa-temperature-low",zones:[
+    {id:"z11a",label:"Items",types:[
+      {id:"t11a1",name:"Sweets & fruit",items:[
+        {id:"i69",name:"Ice cream",qty:1,open:false},
+        {id:"i70",name:"Blueberries",qty:1,open:false},
+        {id:"i71",name:"Cookie dough bites",qty:1,open:false},
+        {id:"i72",name:"Frozen cherries",qty:1,open:false}
+      ]}
+    ]}
+  ]},
+  {id:"s12",label:"Bottom shelf — left",color:"cold",icon:"fa-temperature-low",zones:[
+    {id:"z12a",label:"Items",types:[
+      {id:"t12a1",name:"Quick heat & snacks",items:[
+        {id:"i73",name:"Fries",qty:3,open:false},
+        {id:"i74",name:"Pizza bites",qty:1,open:false}
+      ]},
+      {id:"t12a2",name:"Sweets",items:[
+        {id:"i75",name:"Toaster strudel, strawberry",qty:1,open:false}
+      ]}
+    ]}
+  ]},
+  {id:"s13",label:"Bottom shelf — middle",color:"cold",icon:"fa-temperature-low",zones:[
+    {id:"z13a",label:"Items",types:[
+      {id:"t13a1",name:"Quick heat & snacks",items:[
+        {id:"i76",name:"Potstickers",qty:3,open:false}
+      ]},
+      {id:"t13a2",name:"Fruit",items:[
+        {id:"i77",name:"True Fruit",qty:1,open:false}
+      ]}
+    ]}
+  ]},
+  {id:"s14",label:"Bottom shelf — right",color:"cold",icon:"fa-temperature-low",zones:[
+    {id:"z14a",label:"Items",types:[
+      {id:"t14a1",name:"Quick heat & snacks",items:[
+        {id:"i78",name:"Shredded cheese",qty:7,open:false},
+        {id:"i79",name:"Gluten-free chicken nuggets",qty:1,open:false},
+        {id:"i80",name:"Breaded fish sticks",qty:1,open:false}
+      ]}
+    ]}
+  ]},
+  {id:"s15",label:"Freezer door — shelf 1",color:"door",icon:"fa-door-closed",zones:[
+    {id:"z15a",label:"Items",types:[
+      {id:"t15a1",name:"Pasta & dumplings",items:[
+        {id:"i81",name:"Pierogis",qty:1,open:false},
+        {id:"i82",name:"Mozzarella ravioli",qty:1,open:false}
+      ]},
+      {id:"t15a2",name:"Meats",items:[
+        {id:"i83",name:"Jack & Andy's breakfast sausage",qty:1,open:false},
+        {id:"i84",name:"Prepackaged cold cuts",qty:1,open:false}
+      ]}
+    ]}
+  ]},
+  {id:"s16",label:"Freezer door — shelf 2",color:"door",icon:"fa-door-closed",zones:[
+    {id:"z16a",label:"Items",types:[
+      {id:"t16a1",name:"Breads & snacks",items:[
+        {id:"i85",name:"English muffins",qty:2,open:false},
+        {id:"i86",name:"Gluten-free Texas toast",qty:1,open:false},
+        {id:"i87",name:"Bagel bites",qty:1,open:false}
+      ]}
+    ]}
+  ]},
+  {id:"s17",label:"Freezer door — shelf 3",color:"door",icon:"fa-door-closed",zones:[
+    {id:"z17a",label:"Items",types:[
+      {id:"t17a1",name:"Breads",items:[
+        {id:"i88",name:"Bread",qty:1,open:false}
+      ]},
+      {id:"t17a2",name:"Prepared meals & meats",items:[
+        {id:"i89",name:"Homemade frozen sausage",qty:1,open:false},
+        {id:"i90",name:"Cajun-style Alfredo chicken & sausage",qty:1,open:false},
+        {id:"i91",name:"Crab & spinach dip",qty:1,open:false},
+        {id:"i92",name:"Popcorn shrimp",qty:1,open:false}
+      ]}
+    ]}
+  ]},
+  {id:"s18",label:"Freezer door — bottom",color:"door",icon:"fa-door-closed",zones:[
+    {id:"z18a",label:"Items",types:[
+      {id:"t18a1",name:"Other",items:[
+        {id:"i93",name:"Garlic cheese curds",qty:1,open:false},
+        {id:"i94",name:"Frozen fancy mini cakes",qty:1,open:false}
+      ]}
+    ]}
+  ]}
+]};
+const COLOR_MAP={
+  cold:{bg:"#e4edf7",text:"#1e4a7a",border:"#b5cfe8"},
+  accent:{bg:"#e8f2ec",text:"#2d5a3d",border:"#a8d4b8"},
+  warm:{bg:"#f5ece4",text:"#6b3a2a",border:"#e0c4b0"},
+  pink:{bg:"#fce8f0",text:"#8b2a5a",border:"#e8b0cc"},
+  door:{bg:"#f0ede8",text:"#5a5650",border:"#d0ccc8"}
+};
+
+let data=JSON.parse(JSON.stringify(DEFAULT_DATA));
+let collapsed={};
+let saveTimer=null;
+let moveCtx=null;
+
+function setSyncStatus(state,msg){
+  document.getElementById('syncDot').className='sync-dot '+state;
+  document.getElementById('syncStatus').textContent=msg;
+}
+
+async function loadFromGist(){
+  setSyncStatus('syncing','Loading…');
+  try{
+    const res=await fetch(WORKER_URL,{method:'GET'});
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const text=await res.text();
+    if(text&&text.trim()!=='{}'&&text.trim()!==''){
+      const parsed=JSON.parse(text);
+      if(parsed.shelves){data=parsed;localStorage.setItem('freezer2_data',JSON.stringify(data));}
+      else await saveToGist();
+    } else { await saveToGist(); }
+    setSyncStatus('ok','Synced · '+new Date().toLocaleTimeString());
+  } catch(e){
+    setSyncStatus('error','Sync error: '+e.message+' — using local data');
+    const local=localStorage.getItem('freezer2_data');
+    if(local){try{data=JSON.parse(local);}catch(_){}}
+  }
+  render();
+}
+
+async function saveToGist(){
+  setSyncStatus('syncing','Saving…');
+  try{
+    const res=await fetch(WORKER_URL,{
+      method:'PATCH',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(data)
+    });
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    localStorage.setItem('freezer2_data',JSON.stringify(data));
+    const now=new Date().toLocaleTimeString();
+    document.getElementById('lastSaved').textContent=now;
+    setSyncStatus('ok','Saved · '+now);
+  } catch(e){
+    setSyncStatus('error','Save failed: '+e.message+' — stored locally');
+    localStorage.setItem('freezer2_data',JSON.stringify(data));
+  }
+}
+
+function scheduleSave(){clearTimeout(saveTimer);saveTimer=setTimeout(()=>saveToGist(),1500);}
+function syncNow(){loadFromGist();}
+function uid(){return Math.random().toString(36).slice(2,8);}
+
+function allTypes(){
+  const t=new Set();
+  data.shelves.forEach(s=>s.zones.forEach(z=>z.types.forEach(tp=>t.add(tp.name))));
+  return [...t].sort();
+}
+function updateTypeFilter(){
+  const sel=document.getElementById('typeFilter');
+  const val=sel.value;
+  sel.innerHTML='<option value="">All types</option>'+allTypes().map(t=>`<option value="${esc(t)}"${val===t?' selected':''}>${esc(t)}</option>`).join('');
+}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+function shelfMatches(shelf,q,tf){
+  if(!q&&!tf)return true;
+  return shelf.zones.some(z=>z.types.some(t=>{
+    const tm=!tf||t.name.toLowerCase().includes(tf.toLowerCase());
+    return t.items.some(i=>(!q||i.name.toLowerCase().includes(q.toLowerCase()))&&tm);
+  }));
+}
+
+function render(){
+  updateTypeFilter();
+  const q=document.getElementById('search').value.trim();
+  const tf=document.getElementById('typeFilter').value;
+  const main=document.getElementById('main');
+  let html='',any=false;
+
+  data.shelves.forEach(shelf=>{
+    if(!shelfMatches(shelf,q,tf))return;
+    any=true;
+    const c=COLOR_MAP[shelf.color]||COLOR_MAP.cold;
+    const open=!collapsed[shelf.id];
+    html+=`<div class="shelf-section" data-shelf-id="${shelf.id}">
+      <div class="shelf-header" onclick="toggleShelf('${shelf.id}')">
+        <div class="drag-handle" onmousedown="startDrag(event,'${shelf.id}')" ontouchstart="startDrag(event,'${shelf.id}')" onclick="event.stopPropagation()" title="Drag to reorder"><i class="fa fa-grip-vertical"></i></div>
+        <div class="shelf-icon" style="background:${c.bg};color:${c.text}"><i class="fa ${shelf.icon}" aria-hidden="true"></i></div>
+        <div class="shelf-label">${esc(shelf.label)}</div>
+        <div class="shelf-actions" onclick="event.stopPropagation()">
+          <button class="icon-btn" onclick="editShelfLabel('${shelf.id}')"><i class="fa fa-pen"></i></button>
+          <button class="icon-btn" onclick="deleteShelf('${shelf.id}')"><i class="fa fa-trash"></i></button>
+        </div>
+        <i class="fa fa-chevron-down shelf-toggle ${open?'open':''}" aria-hidden="true"></i>
+      </div>
+      <div class="shelf-body ${open?'':'collapsed'}">`;
+
+    shelf.zones.forEach(zone=>{
+      html+=`<div class="zone">
+        <div class="zone-header">
+          <input class="zone-label-text" value="${esc(zone.label)}" onchange="editZoneLabel('${shelf.id}','${zone.id}',this.value)">
+          <button class="mini-btn" onclick="deleteZone('${shelf.id}','${zone.id}')"><i class="fa fa-trash"></i></button>
+        </div>`;
+      zone.types.forEach(type=>{
+        const tm=!tf||type.name.toLowerCase().includes(tf.toLowerCase());
+        const vis=type.items.filter(i=>(!q||i.name.toLowerCase().includes(q.toLowerCase()))&&tm);
+        if(!tm&&vis.length===0)return;
+        html+=`<div class="type-group">
+          <div class="type-header" style="border-color:${c.border}">
+            <input class="type-name-edit" value="${esc(type.name)}" onchange="editTypeName('${shelf.id}','${zone.id}','${type.id}',this.value)">
+            <button class="mini-btn" onclick="deleteType('${shelf.id}','${zone.id}','${type.id}')"><i class="fa fa-trash"></i></button>
+          </div>`;
+        vis.forEach(item=>{
+          html+=`<div class="item-row">
+            <div class="qty-wrap">
+              <button class="qty-btn" onclick="changeQty('${shelf.id}','${zone.id}','${type.id}','${item.id}',-1)">−</button>
+              <span class="qty">${item.qty}</span>
+              <button class="qty-btn" onclick="changeQty('${shelf.id}','${zone.id}','${type.id}','${item.id}',1)">+</button>
+            </div>
+            <input class="item-name-input" value="${esc(item.name)}" onchange="editItemName('${shelf.id}','${zone.id}','${type.id}','${item.id}',this.value)">
+            ${item.open?'<span class="open-tag">open</span>':''}
+            <div class="item-actions">
+              <button class="act-btn" onclick="toggleOpen('${shelf.id}','${zone.id}','${type.id}','${item.id}')" title="${item.open?'Mark closed':'Mark open'}">${item.open?'📦':'🔓'}</button>
+              <button class="act-btn move" onclick="openMoveModal('${shelf.id}','${zone.id}','${type.id}','${item.id}')" title="Move to another location"><i class="fa fa-arrow-right-arrow-left"></i></button>
+              <button class="act-btn del" onclick="deleteItem('${shelf.id}','${zone.id}','${type.id}','${item.id}')"><i class="fa fa-times"></i></button>
+            </div>
+          </div>`;
+        });
+        html+=`<div class="add-item-row">
+          <input class="add-item-input" placeholder="+ add item…" id="add-${type.id}" onkeydown="if(event.key==='Enter')addItem('${shelf.id}','${zone.id}','${type.id}')">
+          <button class="add-item-btn" onclick="addItem('${shelf.id}','${zone.id}','${type.id}')">Add</button>
+        </div></div>`;
+      });
+      html+=`<button class="add-type-btn" onclick="addType('${shelf.id}','${zone.id}')"><i class="fa fa-tag"></i> Add category</button></div>`;
+    });
+    html+=`<button class="add-zone-btn" onclick="addZone('${shelf.id}')"><i class="fa fa-plus"></i> Add zone</button></div></div>`;
+  });
+
+  if(!any)html=`<div class="no-results"><i class="fa fa-magnifying-glass"></i>No items match your search</div>`;
+  main.innerHTML=html;
+}
+
+function openMoveModal(sid,zid,tid,iid){
+  moveCtx={sid,zid,tid,iid};
+  const item=findItem(sid,zid,tid,iid);
+  document.getElementById('moveItemName').textContent=item.name;
+  const shelfSel=document.getElementById('moveShelf');
+  shelfSel.innerHTML=data.shelves.map(s=>`<option value="${s.id}"${s.id===sid?' selected':''}>${esc(s.label)}</option>`).join('');
+  updateMoveZones();
+  document.getElementById('moveModal').style.display='flex';
+}
+function updateMoveZones(){
+  const sid=document.getElementById('moveShelf').value;
+  const shelf=data.shelves.find(s=>s.id===sid);
+  document.getElementById('moveZone').innerHTML=shelf.zones.map(z=>`<option value="${z.id}">${esc(z.label)}</option>`).join('');
+  updateMoveTypes();
+}
+function updateMoveTypes(){
+  const sid=document.getElementById('moveShelf').value;
+  const zid=document.getElementById('moveZone').value;
+  const zone=data.shelves.find(s=>s.id===sid).zones.find(z=>z.id===zid);
+  const sel=document.getElementById('moveType');
+  sel.innerHTML=zone.types.length
+    ? zone.types.map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join('')
+    : '<option value="__new__">+ Create new category</option>';
+}
+function confirmMove(){
+  const{sid,zid,tid,iid}=moveCtx;
+  const destSid=document.getElementById('moveShelf').value;
+  const destZid=document.getElementById('moveZone').value;
+  let destTid=document.getElementById('moveType').value;
+  if(destSid===sid&&destZid===zid&&destTid===tid){closeMoveModal();return;}
+  const srcType=findType(sid,zid,tid);
+  const item=srcType.items.find(i=>i.id===iid);
+  if(destTid==='__new__'){
+    const name=prompt('New category name:','');
+    if(!name)return;
+    const newType={id:'t'+uid(),name:name.trim(),items:[]};
+    data.shelves.find(s=>s.id===destSid).zones.find(z=>z.id===destZid).types.push(newType);
+    destTid=newType.id;
+  }
+  findType(destSid,destZid,destTid).items.push({...item});
+  srcType.items=srcType.items.filter(i=>i.id!==iid);
+  closeMoveModal();scheduleSave();render();
+}
+function closeMoveModal(){document.getElementById('moveModal').style.display='none';moveCtx=null;}
+
+function findType(sid,zid,tid){return data.shelves.find(s=>s.id===sid).zones.find(z=>z.id===zid).types.find(t=>t.id===tid);}
+function findItem(sid,zid,tid,iid){return findType(sid,zid,tid).items.find(i=>i.id===iid);}
+
+function toggleShelf(id){collapsed[id]=!collapsed[id];render();}
+function editShelfLabel(sid){const s=data.shelves.find(x=>x.id===sid);const v=prompt('Shelf label:',s.label);if(v!=null&&v.trim()){s.label=v.trim();scheduleSave();render();}}
+function deleteShelf(sid){if(!confirm('Delete entire shelf?'))return;data.shelves=data.shelves.filter(x=>x.id!==sid);scheduleSave();render();}
+function editZoneLabel(sid,zid,val){const z=data.shelves.find(s=>s.id===sid).zones.find(z=>z.id===zid);z.label=val.trim()||z.label;scheduleSave();}
+function deleteZone(sid,zid){if(!confirm('Remove this zone?'))return;const s=data.shelves.find(x=>x.id===sid);s.zones=s.zones.filter(x=>x.id!==zid);scheduleSave();render();}
+function addZone(sid){const l=prompt('Zone label:','New zone');if(!l)return;data.shelves.find(x=>x.id===sid).zones.push({id:'z'+uid(),label:l.trim(),types:[]});scheduleSave();render();}
+function editTypeName(sid,zid,tid,val){const t=findType(sid,zid,tid);t.name=val.trim()||t.name;scheduleSave();updateTypeFilter();}
+function deleteType(sid,zid,tid){if(!confirm('Remove this category?'))return;const z=data.shelves.find(s=>s.id===sid).zones.find(z=>z.id===zid);z.types=z.types.filter(t=>t.id!==tid);scheduleSave();render();}
+function addType(sid,zid){const n=prompt('Category name:','New category');if(!n)return;data.shelves.find(s=>s.id===sid).zones.find(z=>z.id===zid).types.push({id:'t'+uid(),name:n.trim(),items:[]});scheduleSave();render();}
+function addItem(sid,zid,tid){const inp=document.getElementById('add-'+tid);const n=inp?inp.value.trim():'';if(!n)return;findType(sid,zid,tid).items.push({id:'i'+uid(),name:n,qty:1,open:false});scheduleSave();render();}
+function editItemName(sid,zid,tid,iid,val){const item=findItem(sid,zid,tid,iid);item.name=val.trim()||item.name;scheduleSave();}
+function changeQty(sid,zid,tid,iid,d){const t=findType(sid,zid,tid);const item=t.items.find(i=>i.id===iid);item.qty=Math.max(0,item.qty+d);if(item.qty===0&&confirm('Qty is 0 — remove item?')){t.items=t.items.filter(i=>i.id!==iid);}scheduleSave();render();}
+function deleteItem(sid,zid,tid,iid){const t=findType(sid,zid,tid);t.items=t.items.filter(i=>i.id!==iid);scheduleSave();render();}
+function toggleOpen(sid,zid,tid,iid){const item=findItem(sid,zid,tid,iid);item.open=!item.open;scheduleSave();render();}
+function addShelf(){openAddShelfModal();}
+
+let selectedShelfColor='cold';
+function openAddShelfModal(){
+  document.getElementById('newShelfLabel').value='';
+  selectedShelfColor='cold';
+  document.querySelectorAll('.color-opt').forEach(el=>{
+    el.classList.toggle('selected',el.dataset.color==='cold');
+  });
+  // wire up color picker clicks
+  document.querySelectorAll('.color-opt').forEach(el=>{
+    el.onclick=function(){
+      selectedShelfColor=this.dataset.color;
+      document.querySelectorAll('.color-opt').forEach(e=>e.classList.remove('selected'));
+      this.classList.add('selected');
+    };
+  });
+  document.getElementById('addShelfModal').style.display='flex';
+  setTimeout(()=>document.getElementById('newShelfLabel').focus(),50);
+}
+function closeAddShelfModal(){document.getElementById('addShelfModal').style.display='none';}
+function confirmAddShelf(){
+  const label=document.getElementById('newShelfLabel').value.trim();
+  if(!label){document.getElementById('newShelfLabel').focus();return;}
+  data.shelves.push({id:'s'+uid(),label:label,color:selectedShelfColor,icon:'fa-snowflake',zones:[]});
+  closeAddShelfModal();scheduleSave();render();
+}
+// allow Enter key in label input to confirm
+document.addEventListener('DOMContentLoaded',()=>{
+  document.getElementById('newShelfLabel').addEventListener('keydown',e=>{if(e.key==='Enter')confirmAddShelf();});
+});
+
+// ── Drag-and-drop shelf reordering ─────────────────────────────────────────
+let drag={active:false,shelfId:null,ghost:null,startY:0,origIdx:0,curIdx:0};
+
+function startDrag(e,shelfId){
+  e.preventDefault();e.stopPropagation();
+  const isTouchEvent=e.type==='touchstart';
+  const clientY=isTouchEvent?e.touches[0].clientY:e.clientY;
+  const clientX=isTouchEvent?e.touches[0].clientX:e.clientX;
+  const idx=data.shelves.findIndex(s=>s.id===shelfId);
+  drag={active:true,shelfId,ghost:null,startY:clientY,origIdx:idx,curIdx:idx};
+
+  // ghost label
+  const ghost=document.createElement('div');
+  ghost.className='drag-ghost';
+  ghost.textContent='⠿ '+data.shelves[idx].label;
+  ghost.style.left=(clientX+12)+'px';
+  ghost.style.top=(clientY-16)+'px';
+  document.body.appendChild(ghost);
+  drag.ghost=ghost;
+
+  if(isTouchEvent){
+    document.addEventListener('touchmove',onDragMove,{passive:false});
+    document.addEventListener('touchend',onDragEnd);
+  } else {
+    document.addEventListener('mousemove',onDragMove);
+    document.addEventListener('mouseup',onDragEnd);
+  }
+}
+
+function onDragMove(e){
+  if(!drag.active)return;
+  e.preventDefault();
+  const isTouchEvent=e.type==='touchmove';
+  const clientY=isTouchEvent?e.touches[0].clientY:e.clientY;
+  const clientX=isTouchEvent?e.touches[0].clientX:e.clientX;
+
+  // move ghost
+  drag.ghost.style.left=(clientX+12)+'px';
+  drag.ghost.style.top=(clientY-16)+'px';
+
+  // find which shelf we're hovering over
+  const sections=document.querySelectorAll('.shelf-section');
+  let hoverIdx=-1;
+  sections.forEach((el,i)=>{
+    const r=el.getBoundingClientRect();
+    if(clientY>=r.top&&clientY<=r.bottom)hoverIdx=i;
+    el.classList.remove('drag-over');
+  });
+  if(hoverIdx>=0&&hoverIdx!==drag.curIdx){
+    sections[hoverIdx].classList.add('drag-over');
+    drag.curIdx=hoverIdx;
+  }
+  // dim dragged shelf
+  sections.forEach(el=>{
+    el.classList.toggle('dragging',el.dataset.shelfId===drag.shelfId);
+  });
+}
+
+function onDragEnd(e){
+  if(!drag.active)return;
+  drag.active=false;
+  if(drag.ghost){drag.ghost.remove();drag.ghost=null;}
+  document.removeEventListener('mousemove',onDragMove);
+  document.removeEventListener('mouseup',onDragEnd);
+  document.removeEventListener('touchmove',onDragMove);
+  document.removeEventListener('touchend',onDragEnd);
+
+  document.querySelectorAll('.shelf-section').forEach(el=>{
+    el.classList.remove('dragging','drag-over');
+  });
+
+  if(drag.curIdx!==drag.origIdx){
+    const shelves=data.shelves;
+    const [moved]=shelves.splice(drag.origIdx,1);
+    shelves.splice(drag.curIdx,0,moved);
+    scheduleSave();render();
+  }
+}
+function exportData(){const b=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='freezer_inventory.json';a.click();}
+
+if(localStorage.getItem('freezer2_auth')==='1'){loadFromGist();}
+setInterval(()=>{if(!saveTimer)loadFromGist();},5*60*1000);
+</script>
+</body>
+</html>
