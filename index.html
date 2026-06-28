@@ -529,12 +529,24 @@ async function loadFromGist(){
     const res=await fetch(WORKER_URL,{method:'GET'});
     if(!res.ok) throw new Error('HTTP '+res.status);
     const text=await res.text();
-    if(text&&text.trim()!=='{}'&&text.trim()!==''){
-      const parsed=JSON.parse(text);
-      if(parsed.shelves){data=parsed;localStorage.setItem('freezer2_data',JSON.stringify(data));}
-      else await saveToGist();
-    } else { await saveToGist(); }
-    setSyncStatus('ok','Synced · '+new Date().toLocaleTimeString());
+    const trimmed=text&&text.trim();
+    let remoteHasData=false;
+    if(trimmed&&trimmed!=='{}'&&trimmed!==''){
+      try{
+        const parsed=JSON.parse(trimmed);
+        if(parsed.shelves&&parsed.shelves.length>0){
+          data=parsed;
+          localStorage.setItem('freezer2_data',JSON.stringify(data));
+          remoteHasData=true;
+        }
+      }catch(_){}
+    }
+    if(!remoteHasData){
+      data=JSON.parse(JSON.stringify(DEFAULT_DATA));
+      await saveToGist();
+    } else {
+      setSyncStatus('ok','Synced · '+new Date().toLocaleTimeString());
+    }
   } catch(e){
     setSyncStatus('error','Sync error: '+e.message+' — using local data');
     const local=localStorage.getItem('freezer2_data');
